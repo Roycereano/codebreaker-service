@@ -1,4 +1,4 @@
-package edu.cnm.deepdive.codebreakerservice;
+package edu.cnm.deepdive.codebreakerservice.model.entity;
 
 import edu.cnm.deepdive.codebreakerservice.model.entity.User;
 import java.util.Date;
