@@ -60,7 +60,7 @@ public class Game {
   @Column(name = "game_text", nullable = false, updatable = false, length = 20)
   private String text;
 
-  @OneToMany(mappedBy = "game", fetch = FetchType.LAZY,
+  @OneToMany(mappedBy = "game", fetch = FetchType.EAGER,
       cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("created ASC ")
   private final List<Guess> guesses = new LinkedList<>();
@@ -122,4 +122,9 @@ public class Game {
     return guesses;
   }
 
+  public boolean isSolved() {
+    return guesses
+        .stream()
+        .anyMatch((guess) -> guess.getExactMatches() == length);
+  }
 }
