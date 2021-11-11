@@ -5,6 +5,8 @@ import edu.cnm.deepdive.codebreakerservice.model.dao.GuessRepository;
 import edu.cnm.deepdive.codebreakerservice.model.entity.Game;
 import edu.cnm.deepdive.codebreakerservice.model.entity.Guess;
 import edu.cnm.deepdive.codebreakerservice.model.entity.User;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -64,10 +66,7 @@ public class GameService {
         .findByExternalKeyAndUser(gameKey, user)
         .map((game) -> {
           int[] guessCodePoints = preprocessGuess(guess, game);
-          int[] codeCodePoints = game
-              .getText()
-              .codePoints()
-              .toArray();
+          int[] codeCodePoints = getCodePoints(game.getText());
           computeMatches(guess, guessCodePoints, codeCodePoints);
           guess.setGame(game);
           return guessRepository.save(guess);
@@ -75,28 +74,46 @@ public class GameService {
         .orElseThrow();
   }
 
-  private void computeMatches(Guess guess, int[] guessCodePoint, int[] codeCodePoints) {
-    // TODO compute exact matches and near matches, and use setters of guess to set these values.
+  private void computeMatches(Guess guess, int[] guessCodePoints, int[] codeCodePoints) {
+    int exactMatches = 0;
+    Map<Integer, Integer> guessCodePointCounts = new HashMap<>();
+    Map<Integer, Integer> codeCodePointCounts = new HashMap<>();
+    for (int i = 0; i < guessCodePoints.length; i++) {
+      if (guessCodePoints[i] == codeCodePoints[i]) {
+        exactMatches++;
+      } else {
+        guessCodePointCounts.put(guessCodePoints[i],
+            1 + guessCodePointCounts.getOrDefault(codeCodePoints[i], 0));
+        codeCodePointCounts.put(codeCodePoints[i],
+            1 + codeCodePointCounts.getOrDefault(codeCodePoints[i], 0));
+      }
+    }
+
+    guess.setExactMatches(exactMatches);
+    int nearMatches = guessCodePointCounts
+        .entrySet()
+        .stream()
+        .mapToInt((entry)->
+            Math.min(entry.getValue(), codeCodePointCounts.getOrDefault(entry.getKey(), 0)))
+        .sum();
+    guess.setNearMatches(nearMatches);
   }
 
   private int[] preprocessGuess(Guess guess, Game game) {
     if (game.isSolved()) {
       throw new IllegalStateException("Game is already solved.");
     }
-    Set<Integer> poolCodePoints = game
-        .getPool()
-        .codePoints()
-        .boxed()
-        .collect(Collectors.toSet());
-    int[] guessCodePoints = guess
-        .getText()
-        .codePoints()
-        .toArray();
+    int[] guessCodePoints = getCodePoints(guess.getText());
     if (guessCodePoints.length != game.getLength()) {
       throw new IllegalArgumentException(
           String.format("Guess must have the same length (%d) as the secret code.",
               game.getLength()));
     }
+    Set<Integer> poolCodePoints = game
+        .getPool()
+        .codePoints()
+        .boxed()
+        .collect(Collectors.toSet());
     if (IntStream
         .of(guessCodePoints)
         .anyMatch((codePoint) -> !poolCodePoints.contains(codePoint))) {
@@ -129,5 +146,11 @@ public class GameService {
         .limit(length)
         .toArray();
     return new String(code, 0, code.length);
+  }
+
+  private int[] getCodePoints(String source) {
+    return source
+        .codePoints()
+        .toArray();
   }
 }
